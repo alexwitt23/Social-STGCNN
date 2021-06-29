@@ -64,7 +64,6 @@ class ConvTemporalGraphical(nn.Module):
         )
 
     def forward(self, x, A):
-        assert A.size(0) == self.kernel_size
         x = self.conv(x)
         x = torch.einsum("nctv,tvw->nctw", (x, A))
         return x.contiguous(), A
@@ -188,7 +187,9 @@ class social_stgcnn(nn.Module):
 
         v = v.view(v.shape[0], v.shape[2], v.shape[1], v.shape[3])
 
+        print("B", v.shape)
         v = self.prelus[0](self.tpcnns[0](v))
+        print("A", v.shape)
 
         for k in range(1, self.n_txpcnn - 1):
             v = self.prelus[k](self.tpcnns[k](v)) + v

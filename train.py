@@ -85,7 +85,6 @@ loader_train = DataLoader(
     num_workers=0,
 )
 
-
 dset_val = TrajectoryDataset(
     data_set + "val/",
     obs_len=obs_seq_len,
@@ -112,7 +111,7 @@ model = social_stgcnn(
     kernel_size=args.kernel_size,
     pred_seq_len=args.pred_seq_len,
 ).cuda()
-
+print(model)
 
 # Training settings
 
@@ -277,6 +276,7 @@ def vald(epoch):
 print("Training started ...")
 for epoch in range(args.num_epochs):
     train(epoch)
+    print("DOBNE")
     vald(epoch)
     if args.use_lrschd:
         scheduler.step()
