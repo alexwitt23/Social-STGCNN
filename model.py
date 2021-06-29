@@ -13,10 +13,8 @@ from torch.nn.modules.module import Module
 import torch.optim as optim
 
 
-
-
 class ConvTemporalGraphical(nn.Module):
-    #Source : https://github.com/yysijie/st-gcn/blob/master/net/st_gcn.py
+    # Source : https://github.com/yysijie/st-gcn/blob/master/net/st_gcn.py
     r"""The basic module for applying a graph convolution.
     Args:
         in_channels (int): Number of channels in the input sequence data
@@ -41,16 +39,19 @@ class ConvTemporalGraphical(nn.Module):
             :math:`T_{in}/T_{out}` is a length of input/output sequence,
             :math:`V` is the number of graph nodes. 
     """
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 t_kernel_size=1,
-                 t_stride=1,
-                 t_padding=0,
-                 t_dilation=1,
-                 bias=True):
-        super(ConvTemporalGraphical,self).__init__()
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        t_kernel_size=1,
+        t_stride=1,
+        t_padding=0,
+        t_dilation=1,
+        bias=True,
+    ):
+        super(ConvTemporalGraphical, self).__init__()
         self.kernel_size = kernel_size
         self.conv = nn.Conv2d(
             in_channels,
@@ -59,14 +60,15 @@ class ConvTemporalGraphical(nn.Module):
             padding=(t_padding, 0),
             stride=(t_stride, 1),
             dilation=(t_dilation, 1),
-            bias=bias)
+            bias=bias,
+        )
 
     def forward(self, x, A):
         assert A.size(0) == self.kernel_size
         x = self.conv(x)
-        x = torch.einsum('nctv,tvw->nctw', (x, A))
+        x = torch.einsum("nctv,tvw->nctw", (x, A))
         return x.contiguous(), A
-    
+
 
 class st_gcn(nn.Module):
     r"""Applies a spatial temporal graph convolution over an input graph sequence.
@@ -89,36 +91,32 @@ class st_gcn(nn.Module):
             :math:`V` is the number of graph nodes.
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size,
-                 use_mdn = False,
-                 stride=1,
-                 dropout=0,
-                 residual=True):
-        super(st_gcn,self).__init__()
-        
-#         print("outstg",out_channels)
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        use_mdn=False,
+        stride=1,
+        dropout=0,
+        residual=True,
+    ):
+        super(st_gcn, self).__init__()
+
+        #         print("outstg",out_channels)
 
         assert len(kernel_size) == 2
         assert kernel_size[0] % 2 == 1
         padding = ((kernel_size[0] - 1) // 2, 0)
         self.use_mdn = use_mdn
 
-        self.gcn = ConvTemporalGraphical(in_channels, out_channels,
-                                         kernel_size[1])
-        
+        self.gcn = ConvTemporalGraphical(in_channels, out_channels, kernel_size[1])
 
         self.tcn = nn.Sequential(
             nn.BatchNorm2d(out_channels),
             nn.PReLU(),
             nn.Conv2d(
-                out_channels,
-                out_channels,
-                (kernel_size[0], 1),
-                (stride, 1),
-                padding,
+                out_channels, out_channels, (kernel_size[0], 1), (stride, 1), padding,
             ),
             nn.BatchNorm2d(out_channels),
             nn.Dropout(dropout, inplace=True),
@@ -132,11 +130,7 @@ class st_gcn(nn.Module):
 
         else:
             self.residual = nn.Sequential(
-                nn.Conv2d(
-                    in_channels,
-                    out_channels,
-                    kernel_size=1,
-                    stride=(stride, 1)),
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=(stride, 1)),
                 nn.BatchNorm2d(out_channels),
             )
 
@@ -148,51 +142,58 @@ class st_gcn(nn.Module):
         x, A = self.gcn(x, A)
 
         x = self.tcn(x) + res
-        
+
         if not self.use_mdn:
             x = self.prelu(x)
 
         return x, A
 
+
 class social_stgcnn(nn.Module):
-    def __init__(self,n_stgcnn =1,n_txpcnn=1,input_feat=2,output_feat=5,
-                 seq_len=8,pred_seq_len=12,kernel_size=3):
-        super(social_stgcnn,self).__init__()
-        self.n_stgcnn= n_stgcnn
+    def __init__(
+        self,
+        n_stgcnn=1,
+        n_txpcnn=1,
+        input_feat=2,
+        output_feat=5,
+        seq_len=8,
+        pred_seq_len=12,
+        kernel_size=3,
+    ):
+        super(social_stgcnn, self).__init__()
+        self.n_stgcnn = n_stgcnn
         self.n_txpcnn = n_txpcnn
-                
+
         self.st_gcns = nn.ModuleList()
-        self.st_gcns.append(st_gcn(input_feat,output_feat,(kernel_size,seq_len)))
-        for j in range(1,self.n_stgcnn):
-            self.st_gcns.append(st_gcn(output_feat,output_feat,(kernel_size,seq_len)))
-        
+        self.st_gcns.append(st_gcn(input_feat, output_feat, (kernel_size, seq_len)))
+        for j in range(1, self.n_stgcnn):
+            self.st_gcns.append(
+                st_gcn(output_feat, output_feat, (kernel_size, seq_len))
+            )
+
         self.tpcnns = nn.ModuleList()
-        self.tpcnns.append(nn.Conv2d(seq_len,pred_seq_len,3,padding=1))
-        for j in range(1,self.n_txpcnn):
-            self.tpcnns.append(nn.Conv2d(pred_seq_len,pred_seq_len,3,padding=1))
-        self.tpcnn_ouput = nn.Conv2d(pred_seq_len,pred_seq_len,3,padding=1)
-            
-            
+        self.tpcnns.append(nn.Conv2d(seq_len, pred_seq_len, 3, padding=1))
+        for j in range(1, self.n_txpcnn):
+            self.tpcnns.append(nn.Conv2d(pred_seq_len, pred_seq_len, 3, padding=1))
+        self.tpcnn_ouput = nn.Conv2d(pred_seq_len, pred_seq_len, 3, padding=1)
+
         self.prelus = nn.ModuleList()
         for j in range(self.n_txpcnn):
             self.prelus.append(nn.PReLU())
 
-
-        
-    def forward(self,v,a):
+    def forward(self, v, a):
 
         for k in range(self.n_stgcnn):
-            v,a = self.st_gcns[k](v,a)
-            
-        v = v.view(v.shape[0],v.shape[2],v.shape[1],v.shape[3])
-        
+            v, a = self.st_gcns[k](v, a)
+
+        v = v.view(v.shape[0], v.shape[2], v.shape[1], v.shape[3])
+
         v = self.prelus[0](self.tpcnns[0](v))
 
-        for k in range(1,self.n_txpcnn-1):
-            v =  self.prelus[k](self.tpcnns[k](v)) + v
-            
+        for k in range(1, self.n_txpcnn - 1):
+            v = self.prelus[k](self.tpcnns[k](v)) + v
+
         v = self.tpcnn_ouput(v)
-        v = v.view(v.shape[0],v.shape[2],v.shape[1],v.shape[3])
-        
-        
-        return v,a
+        v = v.view(v.shape[0], v.shape[2], v.shape[1], v.shape[3])
+
+        return v, a

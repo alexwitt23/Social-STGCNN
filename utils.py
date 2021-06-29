@@ -20,37 +20,36 @@ from tqdm import tqdm
 import time
 
 
-def anorm(p1,p2): 
-    NORM = math.sqrt((p1[0]-p2[0])**2+ (p1[1]-p2[1])**2)
-    if NORM ==0:
+def anorm(p1, p2):
+    NORM = math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+    if NORM == 0:
         return 0
-    return 1/(NORM)
-                
-def seq_to_graph(seq_,seq_rel,norm_lap_matr = True):
+    return 1 / (NORM)
+
+
+def seq_to_graph(seq_, seq_rel, norm_lap_matr=True):
     seq_ = seq_.squeeze()
     seq_rel = seq_rel.squeeze()
     seq_len = seq_.shape[2]
     max_nodes = seq_.shape[0]
 
-    
-    V = np.zeros((seq_len,max_nodes,2))
-    A = np.zeros((seq_len,max_nodes,max_nodes))
+    V = np.zeros((seq_len, max_nodes, 2))
+    A = np.zeros((seq_len, max_nodes, max_nodes))
     for s in range(seq_len):
-        step_ = seq_[:,:,s]
-        step_rel = seq_rel[:,:,s]
-        for h in range(len(step_)): 
-            V[s,h,:] = step_rel[h]
-            A[s,h,h] = 1
-            for k in range(h+1,len(step_)):
-                l2_norm = anorm(step_rel[h],step_rel[k])
-                A[s,h,k] = l2_norm
-                A[s,k,h] = l2_norm
-        if norm_lap_matr: 
-            G = nx.from_numpy_matrix(A[s,:,:])
-            A[s,:,:] = nx.normalized_laplacian_matrix(G).toarray()
-            
-    return torch.from_numpy(V).type(torch.float),\
-           torch.from_numpy(A).type(torch.float)
+        step_ = seq_[:, :, s]
+        step_rel = seq_rel[:, :, s]
+        for h in range(len(step_)):
+            V[s, h, :] = step_rel[h]
+            A[s, h, h] = 1
+            for k in range(h + 1, len(step_)):
+                l2_norm = anorm(step_rel[h], step_rel[k])
+                A[s, h, k] = l2_norm
+                A[s, k, h] = l2_norm
+        if norm_lap_matr:
+            G = nx.from_numpy_matrix(A[s, :, :])
+            A[s, :, :] = nx.normalized_laplacian_matrix(G).toarray()
+
+    return torch.from_numpy(V).type(torch.float), torch.from_numpy(A).type(torch.float)
 
 
 def poly_fit(traj, traj_len, threshold):
@@ -69,13 +68,15 @@ def poly_fit(traj, traj_len, threshold):
         return 1.0
     else:
         return 0.0
-def read_file(_path, delim='\t'):
+
+
+def read_file(_path, delim="\t"):
     data = []
-    if delim == 'tab':
-        delim = '\t'
-    elif delim == 'space':
-        delim = ' '
-    with open(_path, 'r') as f:
+    if delim == "tab":
+        delim = "\t"
+    elif delim == "space":
+        delim = " "
+    with open(_path, "r") as f:
         for line in f:
             line = line.strip().split(delim)
             line = [float(i) for i in line]
@@ -85,9 +86,18 @@ def read_file(_path, delim='\t'):
 
 class TrajectoryDataset(Dataset):
     """Dataloder for the Trajectory datasets"""
+
     def __init__(
-        self, data_dir, obs_len=8, pred_len=8, skip=1, threshold=0.002,
-        min_ped=1, delim='\t',norm_lap_matr = True):
+        self,
+        data_dir,
+        obs_len=8,
+        pred_len=8,
+        skip=1,
+        threshold=0.002,
+        min_ped=1,
+        delim="\t",
+        norm_lap_matr=True,
+    ):
         """
         Args:
         - data_dir: Directory containing dataset files in the format
@@ -124,24 +134,23 @@ class TrajectoryDataset(Dataset):
             frame_data = []
             for frame in frames:
                 frame_data.append(data[frame == data[:, 0], :])
-            num_sequences = int(
-                math.ceil((len(frames) - self.seq_len + 1) / skip))
+            num_sequences = int(math.ceil((len(frames) - self.seq_len + 1) / skip))
 
             for idx in range(0, num_sequences * self.skip + 1, skip):
                 curr_seq_data = np.concatenate(
-                    frame_data[idx:idx + self.seq_len], axis=0)
+                    frame_data[idx : idx + self.seq_len], axis=0
+                )
                 peds_in_curr_seq = np.unique(curr_seq_data[:, 1])
-                self.max_peds_in_frame = max(self.max_peds_in_frame,len(peds_in_curr_seq))
-                curr_seq_rel = np.zeros((len(peds_in_curr_seq), 2,
-                                         self.seq_len))
+                self.max_peds_in_frame = max(
+                    self.max_peds_in_frame, len(peds_in_curr_seq)
+                )
+                curr_seq_rel = np.zeros((len(peds_in_curr_seq), 2, self.seq_len))
                 curr_seq = np.zeros((len(peds_in_curr_seq), 2, self.seq_len))
-                curr_loss_mask = np.zeros((len(peds_in_curr_seq),
-                                           self.seq_len))
+                curr_loss_mask = np.zeros((len(peds_in_curr_seq), self.seq_len))
                 num_peds_considered = 0
                 _non_linear_ped = []
                 for _, ped_id in enumerate(peds_in_curr_seq):
-                    curr_ped_seq = curr_seq_data[curr_seq_data[:, 1] ==
-                                                 ped_id, :]
+                    curr_ped_seq = curr_seq_data[curr_seq_data[:, 1] == ped_id, :]
                     curr_ped_seq = np.around(curr_ped_seq, decimals=4)
                     pad_front = frames.index(curr_ped_seq[0, 0]) - idx
                     pad_end = frames.index(curr_ped_seq[-1, 0]) - idx + 1
@@ -151,14 +160,12 @@ class TrajectoryDataset(Dataset):
                     curr_ped_seq = curr_ped_seq
                     # Make coordinates relative
                     rel_curr_ped_seq = np.zeros(curr_ped_seq.shape)
-                    rel_curr_ped_seq[:, 1:] = \
-                        curr_ped_seq[:, 1:] - curr_ped_seq[:, :-1]
+                    rel_curr_ped_seq[:, 1:] = curr_ped_seq[:, 1:] - curr_ped_seq[:, :-1]
                     _idx = num_peds_considered
                     curr_seq[_idx, :, pad_front:pad_end] = curr_ped_seq
                     curr_seq_rel[_idx, :, pad_front:pad_end] = rel_curr_ped_seq
                     # Linear vs Non-Linear Trajectory
-                    _non_linear_ped.append(
-                        poly_fit(curr_ped_seq, pred_len, threshold))
+                    _non_linear_ped.append(poly_fit(curr_ped_seq, pred_len, threshold))
                     curr_loss_mask[_idx, pad_front:pad_end] = 1
                     num_peds_considered += 1
 
@@ -176,37 +183,48 @@ class TrajectoryDataset(Dataset):
         non_linear_ped = np.asarray(non_linear_ped)
 
         # Convert numpy -> Torch Tensor
-        self.obs_traj = torch.from_numpy(
-            seq_list[:, :, :self.obs_len]).type(torch.float)
-        self.pred_traj = torch.from_numpy(
-            seq_list[:, :, self.obs_len:]).type(torch.float)
-        self.obs_traj_rel = torch.from_numpy(
-            seq_list_rel[:, :, :self.obs_len]).type(torch.float)
-        self.pred_traj_rel = torch.from_numpy(
-            seq_list_rel[:, :, self.obs_len:]).type(torch.float)
+        self.obs_traj = torch.from_numpy(seq_list[:, :, : self.obs_len]).type(
+            torch.float
+        )
+        self.pred_traj = torch.from_numpy(seq_list[:, :, self.obs_len :]).type(
+            torch.float
+        )
+        self.obs_traj_rel = torch.from_numpy(seq_list_rel[:, :, : self.obs_len]).type(
+            torch.float
+        )
+        self.pred_traj_rel = torch.from_numpy(seq_list_rel[:, :, self.obs_len :]).type(
+            torch.float
+        )
         self.loss_mask = torch.from_numpy(loss_mask_list).type(torch.float)
         self.non_linear_ped = torch.from_numpy(non_linear_ped).type(torch.float)
         cum_start_idx = [0] + np.cumsum(num_peds_in_seq).tolist()
         self.seq_start_end = [
-            (start, end)
-            for start, end in zip(cum_start_idx, cum_start_idx[1:])
+            (start, end) for start, end in zip(cum_start_idx, cum_start_idx[1:])
         ]
-        #Convert to Graphs 
-        self.v_obs = [] 
-        self.A_obs = [] 
-        self.v_pred = [] 
-        self.A_pred = [] 
+        # Convert to Graphs
+        self.v_obs = []
+        self.A_obs = []
+        self.v_pred = []
+        self.A_pred = []
         print("Processing Data .....")
-        pbar = tqdm(total=len(self.seq_start_end)) 
+        pbar = tqdm(total=len(self.seq_start_end))
         for ss in range(len(self.seq_start_end)):
             pbar.update(1)
 
             start, end = self.seq_start_end[ss]
 
-            v_,a_ = seq_to_graph(self.obs_traj[start:end,:],self.obs_traj_rel[start:end, :],self.norm_lap_matr)
+            v_, a_ = seq_to_graph(
+                self.obs_traj[start:end, :],
+                self.obs_traj_rel[start:end, :],
+                self.norm_lap_matr,
+            )
             self.v_obs.append(v_.clone())
             self.A_obs.append(a_.clone())
-            v_,a_=seq_to_graph(self.pred_traj[start:end,:],self.pred_traj_rel[start:end, :],self.norm_lap_matr)
+            v_, a_ = seq_to_graph(
+                self.pred_traj[start:end, :],
+                self.pred_traj_rel[start:end, :],
+                self.norm_lap_matr,
+            )
             self.v_pred.append(v_.clone())
             self.A_pred.append(a_.clone())
         pbar.close()
@@ -218,11 +236,15 @@ class TrajectoryDataset(Dataset):
         start, end = self.seq_start_end[index]
 
         out = [
-            self.obs_traj[start:end, :], self.pred_traj[start:end, :],
-            self.obs_traj_rel[start:end, :], self.pred_traj_rel[start:end, :],
-            self.non_linear_ped[start:end], self.loss_mask[start:end, :],
-            self.v_obs[index], self.A_obs[index],
-            self.v_pred[index], self.A_pred[index]
-
+            self.obs_traj[start:end, :],
+            self.pred_traj[start:end, :],
+            self.obs_traj_rel[start:end, :],
+            self.pred_traj_rel[start:end, :],
+            self.non_linear_ped[start:end],
+            self.loss_mask[start:end, :],
+            self.v_obs[index],
+            self.A_obs[index],
+            self.v_pred[index],
+            self.A_pred[index],
         ]
         return out
