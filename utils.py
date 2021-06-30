@@ -16,7 +16,7 @@ import tqdm
 
 
 def anorm(p1: torch.Tensor, p2: torch.Tensor) -> torch.Tensor:
-    norm = torch.norm(p1 - p2)
+    norm = torch.linalg.norm(p1 - p2)
     if norm == 0:
         return 0
     return 1 / (norm)

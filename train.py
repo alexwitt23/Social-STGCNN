@@ -178,7 +178,6 @@ def train(epoch):
         V_obs_tmp = V_obs.permute(0, 3, 1, 2)
 
         V_pred, _ = model(V_obs_tmp, A_obs.squeeze())
-
         V_pred = V_pred.permute(0, 2, 3, 1)
 
         V_tr = V_tr.squeeze()

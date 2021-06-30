@@ -1,6 +1,7 @@
 import os
 import math
 import sys
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -44,15 +45,13 @@ class ConvTemporalGraphical(nn.Module):
         self,
         in_channels,
         out_channels,
-        kernel_size,
         t_kernel_size=1,
         t_stride=1,
         t_padding=0,
         t_dilation=1,
         bias=True,
     ):
-        super(ConvTemporalGraphical, self).__init__()
-        self.kernel_size = kernel_size
+        super().__init__()
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,
@@ -65,6 +64,7 @@ class ConvTemporalGraphical(nn.Module):
 
     def forward(self, x, A):
         x = self.conv(x)
+        
         x = torch.einsum("nctv,tvw->nctw", (x, A))
         return x.contiguous(), A
 
@@ -92,24 +92,20 @@ class st_gcn(nn.Module):
 
     def __init__(
         self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        use_mdn=False,
-        stride=1,
-        dropout=0,
-        residual=True,
-    ):
-        super(st_gcn, self).__init__()
-
-        #         print("outstg",out_channels)
+        in_channels: int,
+        out_channels: int,
+        kernel_size: Tuple[int, int],
+        stride: int = 1,
+        dropout: float = 0,
+        residual: bool = True,
+    ) -> None:
+        super().__init__()
 
         assert len(kernel_size) == 2
         assert kernel_size[0] % 2 == 1
         padding = ((kernel_size[0] - 1) // 2, 0)
-        self.use_mdn = use_mdn
 
-        self.gcn = ConvTemporalGraphical(in_channels, out_channels, kernel_size[1])
+        self.gcn = ConvTemporalGraphical(in_channels, out_channels)
 
         self.tcn = nn.Sequential(
             nn.BatchNorm2d(out_channels),
@@ -141,9 +137,7 @@ class st_gcn(nn.Module):
         x, A = self.gcn(x, A)
 
         x = self.tcn(x) + res
-
-        if not self.use_mdn:
-            x = self.prelu(x)
+        x = self.prelu(x)
 
         return x, A
 
@@ -187,9 +181,7 @@ class social_stgcnn(nn.Module):
 
         v = v.view(v.shape[0], v.shape[2], v.shape[1], v.shape[3])
 
-        print("B", v.shape)
         v = self.prelus[0](self.tpcnns[0](v))
-        print("A", v.shape)
 
         for k in range(1, self.n_txpcnn - 1):
             v = self.prelus[k](self.tpcnns[k](v)) + v
