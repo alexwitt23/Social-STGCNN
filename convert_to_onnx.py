@@ -11,8 +11,8 @@ model = social_stgcnn(
 ).cuda()
 
 
-input_names = ["kernel", "velocities"]
-output_names = ["velocities", "kernel"]
+input_names = ["vertices", "adjacency_kernel"]
+output_names = ["vertices", "adjacency_kernel"]
 
 torch.onnx.export(
     model,

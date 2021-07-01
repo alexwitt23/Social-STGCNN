@@ -143,6 +143,7 @@ constant_metrics = {"min_val_epoch": -1, "min_val_loss": 9999999999999999}
 def train(epoch):
     global metrics, loader_train
     model.train()
+    print(model)
     loss_batch = 0
     batch_count = 0
     is_fst_loss = True

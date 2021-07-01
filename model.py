@@ -52,6 +52,7 @@ class ConvTemporalGraphical(nn.Module):
         bias=True,
     ):
         super().__init__()
+        
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,
@@ -61,10 +62,13 @@ class ConvTemporalGraphical(nn.Module):
             dilation=(t_dilation, 1),
             bias=bias,
         )
+        print(self.conv)
+        self.t_kernel_size = t_kernel_size
 
     def forward(self, x, A):
+        print(x.shape, A.shape)
         x = self.conv(x)
-        
+        print(x.shape, "WEIGHT", self.conv.weight.shape, self.t_kernel_size, A.shape)
         x = torch.einsum("nctv,tvw->nctw", (x, A))
         return x.contiguous(), A
 

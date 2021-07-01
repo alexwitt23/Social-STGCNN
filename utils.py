@@ -26,8 +26,8 @@ def seq_to_graph(seq_: torch.Tensor, seq_rel: torch.Tensor, norm_lap_matr=True):
     """Convert a sequence to a graph trajectory.
 
     Args:
-        seq_: the sequence of velocities for pedestrians: [pedestrian, vel, prev_frames]
-        seq_: the sequence of relative velocities for pedestrians:
+        seq_: the sequence of positions for pedestrians: [pedestrian, vel, prev_frames]
+        seq_: the sequence of relative positions for pedestrians:
             [pedestrian, vel, prev_frames]
 
     """
@@ -38,7 +38,7 @@ def seq_to_graph(seq_: torch.Tensor, seq_rel: torch.Tensor, norm_lap_matr=True):
     # Max number of pedestrians
     max_nodes = seq_.shape[0]
 
-    velocity = np.zeros((seq_len, max_nodes, 2))
+    vertices = np.zeros((seq_len, max_nodes, 2))
     adjecency = np.zeros((seq_len, max_nodes, max_nodes))
 
     for seq_idx in range(seq_len):
@@ -48,7 +48,7 @@ def seq_to_graph(seq_: torch.Tensor, seq_rel: torch.Tensor, norm_lap_matr=True):
         # to all others.
         num_people = len(step_)
         for pedestrian_a in range(num_people):
-            velocity[seq_idx, pedestrian_a, :] = step_rel[pedestrian_a]
+            vertices[seq_idx, pedestrian_a, :] = step_rel[pedestrian_a]
             adjecency[seq_idx, pedestrian_a, pedestrian_a] = 1
             for pedestrian_b in range(pedestrian_a + 1, num_people):
                 # Get the adjacent norm (1 / l2_norm) between the humans
@@ -60,7 +60,7 @@ def seq_to_graph(seq_: torch.Tensor, seq_rel: torch.Tensor, norm_lap_matr=True):
         #    G = nx.from_numpy_matrix(adjecency[s, :, :])
         #    adjecency[s, :, :] = nx.normalized_laplacian_matrix(G).toarray()
 
-    return torch.Tensor(velocity), torch.Tensor(adjecency)
+    return torch.Tensor(vertices), torch.Tensor(adjecency)
 
 
 def poly_fit(traj, traj_len, threshold):
